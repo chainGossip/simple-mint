@@ -166,7 +166,7 @@ export default {
             if (type.indexOf('Vec<') >= 0) {
               converted = converted.split(',').map(e => e.trim())
               converted = converted.map(single =>
-                isNumType(type)
+                this.isNumType(type)
                   ? single.indexOf('.') >= 0
                     ? Number.parseFloat(single)
                     : Number.parseInt(single)
@@ -176,7 +176,7 @@ export default {
             }
 
             // Deal with a single value
-            if (isNumType(type)) {
+            if (this.isNumType(type)) {
               converted =
                 converted.indexOf('.') >= 0
                   ? Number.parseFloat(converted)
@@ -396,7 +396,7 @@ select option {
   height: 100px;
 }
 body {
-  background: #1c1c1c;
+background: #706e6e;
 }
 .btn_wallet {
   background: #80115e;
