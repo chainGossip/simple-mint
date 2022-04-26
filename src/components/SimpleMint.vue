@@ -9,8 +9,6 @@
           <select @change="onPalletsChange($event)" v-model="palletRPC">
             <option v-for = "a in palletRPCs" v-bind:key="a">{{a.key}}</option>
           </select>
-          <div ></div>
-          <!-- <v-select :options="['Canada', 'United States']"></v-select> -->
         </div>
         <div class="form_group">
           <select @change="onCallablesChange($event)" v-model="key">
@@ -29,12 +27,10 @@
   </div>
 </template>
 <script>
-import { ApiPromise, WsProvider } from '@polkadot/api';
 import apiAsync from '../../connection.js'
 import { web3Accounts, web3Enable } from '@polkadot/extension-dapp'
 import { keyring as Keyring } from '@polkadot/ui-keyring'
 import { isTestChain } from '@polkadot/util'
-import { cryptoWaitReady } from '@polkadot/util-crypto';
 import { web3FromSource } from '@polkadot/extension-dapp'
 
 import utils from '../utils'
@@ -68,264 +64,259 @@ export default {
               systemChainType,
           }
       },
-        loadAccount() {
-          const asyncLoadAccounts = async() => {
-            try {
-                await web3Enable("SimpleMint")
-                let allAccounts = await web3Accounts()
+      loadAccount() {
+        const asyncLoadAccounts = async() => {
+          try {
+              await web3Enable("SimpleMint")
+              let allAccounts = await web3Accounts()
 
-                allAccounts = allAccounts.map(({ address, meta }) => ({
-                    address,
-                    meta: {...meta, name: `${meta.name} (${meta.source})` },
-                }))
-
-                // Logics to check if the connecting chain is a dev chain, coming from polkadot-js Apps
-                // ref: https://github.com/polkadot-js/apps/blob/15b8004b2791eced0dde425d5dc7231a5f86c682/packages/react-api/src/Api.tsx?_pjax=div%5Bitemtype%3D%22http%3A%2F%2Fschema.org%2FSoftwareSourceCode%22%5D%20%3E%20main#L101-L110
-                const { systemChain, systemChainType } = await this.retrieveChainInfo(api)
-                const isDevelopment =
-                    systemChainType.isDevelopment ||
-                    systemChainType.isLocal ||
-                     isTestChain(systemChain)
-
-                Keyring.loadAll({
-                    isDevelopment,
-                  },
-                  allAccounts
-                )
-                console.log(Keyring)
-                this.keyring = Keyring;
-                 const keyringOptions = Keyring.getPairs().map(account => ({
-                key: account.address,
-                value: account.address,
-                text: account.meta.name.toUpperCase(),
-                icon: 'user',
+              allAccounts = allAccounts.map(({ address, meta }) => ({
+                  address,
+                  meta: {...meta, name: `${meta.name} (${meta.source})` },
               }))
 
-              const initialAddress =
-                keyringOptions.length > 0 ? keyringOptions[0].value : '';
-              this.currentAccount = Keyring.getPair(initialAddress)
-              console.log(this.currentAccount)
-            } catch (e) {
-                console.error(e)
-            }
-        }
-        asyncLoadAccounts()
-        },
-        async handleBtn() {
-          if(this.paramSet == []) 
-            return
-          this.loadAccount();
-           const fromAcct = await this.getFromAcct();
-           console.log(this.paramSet)
+              // Logics to check if the connecting chain is a dev chain, coming from polkadot-js Apps
+              // ref: https://github.com/polkadot-js/apps/blob/15b8004b2791eced0dde425d5dc7231a5f86c682/packages/react-api/src/Api.tsx?_pjax=div%5Bitemtype%3D%22http%3A%2F%2Fschema.org%2FSoftwareSourceCode%22%5D%20%3E%20main#L101-L110
+              const { systemChain, systemChainType } = await this.retrieveChainInfo(api)
+              const isDevelopment =
+                  systemChainType.isDevelopment ||
+                  systemChainType.isLocal ||
+                    isTestChain(systemChain)
 
-          const transformed = this.transformParams(this.paramFields, this.paramSet)
-          // transformed can be empty parameters
-
-          const txExecute = transformed
-            ? api.tx[this.palletRpc][this.callable](...transformed)
-            : api.tx[this.palletRpc][this.callable]()
-
-          const unsub = await txExecute
-            .signAndSend(...fromAcct, txResHandler)
-            .catch(txErrHandler)
-
-          setUnsub(() => unsub)
-        },
-        transformParams(
-          paramFields,
-          inputParams,
-          opts = { emptyAsNull: true }
-        ) {
-          // if `opts.emptyAsNull` is true, empty param value will be added to res as `null`.
-          //   Otherwise, it will not be added
-          const paramVal = inputParams.map(inputParam => {
-            // To cater the js quirk that `null` is a type of `object`.
-            if (
-              typeof inputParam === 'object' &&
-              inputParam !== null &&
-              typeof inputParam.value === 'string'
-            ) {
-              return inputParam.value.trim()
-            } else if (typeof inputParam === 'string') {
-              return inputParam.trim()
-            }
-            return inputParam
-          })
-          const params = paramFields.map((field, ind) => ({
-            ...field,
-            value: paramVal[ind] || null,
-          }))
-
-          return params.reduce((memo, { type = 'string', value }) => {
-            if (value == null || value === '')
-              return opts.emptyAsNull ? [...memo, null] : memo
-
-            let converted = value
-
-            // Deal with a vector
-            if (type.indexOf('Vec<') >= 0) {
-              converted = converted.split(',').map(e => e.trim())
-              converted = converted.map(single =>
-                this.isNumType(type)
-                  ? single.indexOf('.') >= 0
-                    ? Number.parseFloat(single)
-                    : Number.parseInt(single)
-                  : single
+              Keyring.loadAll({
+                  isDevelopment,
+                },
+                allAccounts
               )
-              return [...memo, converted]
-            }
+              console.log(Keyring)
+              this.keyring = Keyring;
+                const keyringOptions = Keyring.getPairs().map(account => ({
+              key: account.address,
+              value: account.address,
+              text: account.meta.name.toUpperCase(),
+              icon: 'user',
+            }))
 
-            // Deal with a single value
-            if (this.isNumType(type)) {
-              converted =
-                converted.indexOf('.') >= 0
-                  ? Number.parseFloat(converted)
-                  : Number.parseInt(converted)
-            }
+            const initialAddress =
+              keyringOptions.length > 0 ? keyringOptions[0].value : '';
+            this.currentAccount = Keyring.getPair(initialAddress)
+            console.log(this.currentAccount)
+          } catch (e) {
+              console.error(e)
+          }
+      }
+      asyncLoadAccounts()
+      },
+      async handleBtn() {
+        if(this.paramSet == []) 
+          return
+        this.loadAccount();
+          const fromAcct = await this.getFromAcct();
+          console.log(this.paramSet)
+
+        const transformed = this.transformParams(this.paramFields, this.paramSet)
+        // transformed can be empty parameters
+
+        const txExecute = transformed
+          ? api.tx[this.palletRpc][this.callable](...transformed)
+          : api.tx[this.palletRpc][this.callable]()
+
+        const unsub = await txExecute
+          .signAndSend(...fromAcct, txResHandler)
+          .catch(txErrHandler)
+
+        setUnsub(() => unsub)
+      },
+      transformParams(
+        paramFields,
+        inputParams,
+        opts = { emptyAsNull: true }
+      ) 
+      {
+        // if `opts.emptyAsNull` is true, empty param value will be added to res as `null`.
+        //   Otherwise, it will not be added
+        const paramVal = inputParams.map(inputParam => {
+          // To cater the js quirk that `null` is a type of `object`.
+          if (
+            typeof inputParam === 'object' &&
+            inputParam !== null &&
+            typeof inputParam.value === 'string'
+          ) {
+            return inputParam.value.trim()
+          } else if (typeof inputParam === 'string') {
+            return inputParam.trim()
+          }
+          return inputParam
+        })
+        const params = paramFields.map((field, ind) => ({
+          ...field,
+          value: paramVal[ind] || null,
+        }))
+
+        return params.reduce((memo, { type = 'string', value }) => {
+          if (value == null || value === '')
+            return opts.emptyAsNull ? [...memo, null] : memo
+
+          let converted = value
+
+          // Deal with a vector
+          if (type.indexOf('Vec<') >= 0) {
+            converted = converted.split(',').map(e => e.trim())
+            converted = converted.map(single =>
+              this.isNumType(type)
+                ? single.indexOf('.') >= 0
+                  ? Number.parseFloat(single)
+                  : Number.parseInt(single)
+                : single
+            )
             return [...memo, converted]
-          }, [])
-        },
-        async getFromAcct() {
-          const {
-            address,
-            meta,
-          } = this.currentAccount
+          }
 
-          // if (!isInjected) {
-          //   return [currentAccount]
-          // }
-          console.log(this.currentAccount)
-          // currentAccount is injected from polkadot-JS extension, need to return the addr and signer object.
-          // ref: https://polkadot.js.org/docs/extension/cookbook#sign-and-send-a-transaction
-          const injector = await web3FromSource("polkadot-js")
-          console.log(injector)
-          return [address, { signer: injector.signer }]
-        },
-        isNumType(type) {
-          return utils.paramConversion.num.some(el => type.indexOf(el) >= 0)
-        },
-        onChange(e) {
-          this.paramSet[parseInt(e.target.name)] = e.target.value
-        },
-        onPalletsChange(e) {
-          this.palletRpc = e.target.value
-          this.updateCallables();
-          this.paramSet = []
-        },
-        onCallablesChange(e) {
-          this.callable = e.target.value
+          // Deal with a single value
+          if (this.isNumType(type)) {
+            converted =
+              converted.indexOf('.') >= 0
+                ? Number.parseFloat(converted)
+                : Number.parseInt(converted)
+          }
+          return [...memo, converted]
+        }, [])
+      },
+      async getFromAcct() {
+        const {
+          address,
+          meta,
+        } = this.currentAccount
+
+        // if (!isInjected) {
+        //   return [currentAccount]
+        // }
+        console.log(this.currentAccount)
+        // currentAccount is injected from polkadot-JS extension, need to return the addr and signer object.
+        // ref: https://polkadot.js.org/docs/extension/cookbook#sign-and-send-a-transaction
+        const injector = await web3FromSource("polkadot-js")
+        console.log(injector)
+        return [address, { signer: injector.signer }]
+      },
+      isNumType(type) {
+        return utils.paramConversion.num.some(el => type.indexOf(el) >= 0)
+      },
+      onChange(e) {
+        this.paramSet[parseInt(e.target.name)] = e.target.value
+      },
+      onPalletsChange(e) {
+        this.palletRpc = e.target.value
+        this.updateCallables();
+        this.paramSet = []
+      },
+      onCallablesChange(e) {
+        this.callable = e.target.value
+        this.updateParamFields()
+        this.paramSet = []
+      },
+      getApiType() {
+          if (this.interxType === 'QUERY') {
+          return api.query
+          } else if (this.interxType === 'EXTRINSIC') {
+          return api.tx
+          } else if (this.interxType === 'RPC') {
+          return api.rpc
+          } else {
+          return api.consts
+          }
+      },
+      updatePalletRPCs() {
+          if (!api) {
+          return
+          }
+          const apiType = this.getApiType(api, this.interxType)
+          const palletRPCs = Object.keys(apiType)
+          .sort()
+          .filter(pr => Object.keys(apiType[pr]).length > 0)
+          .map(pr => ({ key: pr, value: pr, text: pr }))
+          console.log(palletRPCs)
+          this.palletRPCs = palletRPCs
+          this.palletRpc = palletRPCs[0].key
+          this.updateCallables()
+      },
+      updateCallables() {
+          if (!api || this.palletRpcs === []) {
+          return
+          }
+          const callables = Object.keys(this.getApiType(api, this.interxType)[this.palletRpc])
+          .sort()
+          .map(c => ({ key: c, value: c, text: c }))
+          this.callables = callables
           this.updateParamFields()
-          this.paramSet = []
-        },
-        getApiType() {
-            if (this.interxType === 'QUERY') {
-            return api.query
-            } else if (this.interxType === 'EXTRINSIC') {
-            return api.tx
-            } else if (this.interxType === 'RPC') {
-            return api.rpc
-            } else {
-            return api.consts
-            }
-        },
-        updatePalletRPCs() {
-            if (!api) {
-            return
-            }
-            const apiType = this.getApiType(api, this.interxType)
-            const palletRPCs = Object.keys(apiType)
-            .sort()
-            .filter(pr => Object.keys(apiType[pr]).length > 0)
-            .map(pr => ({ key: pr, value: pr, text: pr }))
-            console.log(palletRPCs)
-            this.palletRPCs = palletRPCs
-            this.palletRpc = palletRPCs[0].key
-            this.updateCallables()
-        },
-        updateCallables() {
-            if (!api || this.palletRpcs === []) {
-            return
-            }
-            const callables = Object.keys(this.getApiType(api, this.interxType)[this.palletRpc])
-            .sort()
-            .map(c => ({ key: c, value: c, text: c }))
-            this.callables = callables
-            this.updateParamFields()
-        },
-        updateParamFields() {
-          console.log("updateParam")
-            if (!api || this.palletRpc === '' || this.callable === '') {
-            this.paramFields = []
-            return
-            }
+      },
+      updateParamFields() {
+        console.log("updateParam")
+          if (!api || this.palletRpc === '' || this.callable === '') {
+          this.paramFields = []
+          return
+          }
 
-            let paramFields = []
+          let paramFields = []
 
-            if (this.interxType === 'QUERY') {
-            const metaType = api.query[this.palletRpc][this.callable].meta.type
-            if (metaType.isPlain) {
-                // Do nothing as `paramFields` is already set to []
-            } else if (metaType.isMap) {
-                paramFields = [
-                {
-                    name: metaType.asMap.key.toString(),
-                    type: metaType.asMap.key.toString(),
-                    optional: false,
-                },
-                ]
-            } else if (metaType.isDoubleMap) {
-                paramFields = [
-                {
-                    name: metaType.asDoubleMap.key1.toString(),
-                    type: metaType.asDoubleMap.key1.toString(),
-                    optional: false,
-                },
-                {
-                    name: metaType.asDoubleMap.key2.toString(),
-                    type: metaType.asDoubleMap.key2.toString(),
-                    optional: false,
-                },
-                ]
-            }
-            } else if (this.interxType === 'EXTRINSIC') {
-            const metaArgs = api.tx[this.palletRpc][this.callable].meta.args
+          if (this.interxType === 'QUERY') {
+          const metaType = api.query[this.palletRpc][this.callable].meta.type
+          if (metaType.isPlain) {
+              // Do nothing as `paramFields` is already set to []
+          } else if (metaType.isMap) {
+              paramFields = [
+              {
+                  name: metaType.asMap.key.toString(),
+                  type: metaType.asMap.key.toString(),
+                  optional: false,
+              },
+              ]
+          } else if (metaType.isDoubleMap) {
+              paramFields = [
+              {
+                  name: metaType.asDoubleMap.key1.toString(),
+                  type: metaType.asDoubleMap.key1.toString(),
+                  optional: false,
+              },
+              {
+                  name: metaType.asDoubleMap.key2.toString(),
+                  type: metaType.asDoubleMap.key2.toString(),
+                  optional: false,
+              },
+              ]
+          }
+          } else if (this.interxType === 'EXTRINSIC') {
+          const metaArgs = api.tx[this.palletRpc][this.callable].meta.args
 
-            if (metaArgs && metaArgs.length > 0) {
-                paramFields = metaArgs.map(arg => ({
-                name: arg.name.toString(),
-                type: arg.type.toString(),
-                }))
-            }
-            } else if (this.interxType === 'RPC') {
-            let metaParam = []
+          if (metaArgs && metaArgs.length > 0) {
+              paramFields = metaArgs.map(arg => ({
+              name: arg.name.toString(),
+              type: arg.type.toString(),
+              }))
+          }
+          } else if (this.interxType === 'RPC') {
+          let metaParam = []
 
-            if (jsonrpc[this.palletRpc] && jsonrpc[this.palletRpc][this.callable]) {
-                metaParam = jsonrpc[this.palletRpc][this.callable].params
-            }
+          if (jsonrpc[this.palletRpc] && jsonrpc[this.palletRpc][this.callable]) {
+              metaParam = jsonrpc[this.palletRpc][this.callable].params
+          }
 
-            if (metaParam.length > 0) {
-                paramFields = metaParam.map(arg => ({
-                name: arg.name,
-                type: arg.type,
-                optional: arg.isOptional || false,
-                }))
-            }
-            } else if (this.interxType === 'CONSTANT') {
-            paramFields = []
-            }
+          if (metaParam.length > 0) {
+              paramFields = metaParam.map(arg => ({
+              name: arg.name,
+              type: arg.type,
+              optional: arg.isOptional || false,
+              }))
+          }
+          } else if (this.interxType === 'CONSTANT') {
+          paramFields = []
+          }
 
-            this.paramFields = paramFields;
-            this.paramSet.fill(0, 0, this.paramFields.length - 1)
-        },
-      
-    },
-    mounted() {
-      this.updatePalletRPCs()
-      // this.updateCallables()
+          this.paramFields = paramFields;
+          this.paramSet.fill('', 0, this.paramFields.length - 1)
+      },
     },
     created() {
        this.updatePalletRPCs()
-      //  this.updateCallables()
     }
 }
 </script>
@@ -396,7 +387,7 @@ select option {
   height: 100px;
 }
 body {
-background: #706e6e;
+  background: #706e6e;
 }
 .btn_wallet {
   background: #80115e;
